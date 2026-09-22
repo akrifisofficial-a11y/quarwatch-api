@@ -1,0 +1,43 @@
+name: Register User
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'Username'
+        required: true
+      password:
+        description: 'Password (hashed)'
+        required: true
+      email:
+        description: 'Email'
+        required: false
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update users.json
+        run: |
+          CONTENT=$(cat data/users.json)
+          NEW_USER=$(jq -n \
+            --arg username "${{ github.event.inputs.username }}" \
+            --arg password "${{ github.event.inputs.password }}" \
+            --arg email "${{ github.event.inputs.email }}" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{username: $username, password: $password, email: $email, avatar: "👤", registered_at: $date}')
+          echo "$CONTENT" | jq --argjson user "$NEW_USER" '.users += [$user]' > data/users.json
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add data/users.json
+          git commit -m "Register: ${{ github.event.inputs.username }}" || exit 0
+          git push
