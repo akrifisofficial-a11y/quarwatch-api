@@ -1,0 +1,50 @@
+name: Update User
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        required: false
+      avatar:
+        required: false
+      old_username:
+        required: false
+      new_username:
+        required: false
+      action:
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update user
+        run: |
+          CONTENT=$(cat data/users.json)
+          ACTION="${{ github.event.inputs.action }}"
+
+          if [ "$ACTION" = "update_avatar" ]; then
+            USERNAME="${{ github.event.inputs.username }}"
+            AVATAR="${{ github.event.inputs.avatar }}"
+            echo "$CONTENT" | jq --arg u "$USERNAME" --arg a "$AVATAR" \
+              '(.users[] | select(.username == $u) | .avatar) = $a' > data/users.json
+          fi
+
+          if [ "$ACTION" = "update_name" ]; then
+            OLD="${{ github.event.inputs.old_username }}"
+            NEW="${{ github.event.inputs.new_username }}"
+            echo "$CONTENT" | jq --arg o "$OLD" --arg n "$NEW" \
+              '(.users[] | select(.username == $o) | .username) = $n' > data/users.json
+          fi
+
+      - name: Commit
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add data/users.json
+          git commit -m "Update: ${{ github.event.inputs.action }}" || exit 0
+          git push
